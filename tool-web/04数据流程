@@ -1,0 +1,141 @@
+# 项目目录结构与数据流程说明
+
+## 一、项目总览
+
+```
+/tool-web-backend      # 后端Spring Boot服务
+/tool-web-frontend     # 前端React+Vite项目
+/tool-web              # 项目文档与架构说明
+```
+
+---
+
+## 二、后端目录结构与文件作用
+
+```
+tool-web-backend/
+├── pom.xml                        # Maven依赖配置
+├── src/
+│   └── main/
+│       ├── java/
+│       │   └── com/toolweb/
+│       │       ├── ToolWebApplication.java      # Spring Boot启动类
+│       │       ├── controller/                  # 控制器，接口实现
+│       │       │   ├── ConvertController.java   # 文件格式转换接口
+│       │       │   └── FileController.java      # 文件上传/下载等接口
+│       │       ├── config/                      # 配置类
+│       │       │   ├── WebConfig.java           # 跨域、静态资源等配置
+│       │       │   ├── SecurityConfig.java      # Spring Security安全配置
+│       │       │   ├── RedisConfig.java         # Redis相关配置
+│       │       │   ├── MinioConfig.java         # Minio对象存储配置
+│       │       │   └── CorsConfig.java          # CORS跨域配置
+│       │       ├── service/                     # 业务服务层（可扩展）
+│       │       └── common/                      # 通用工具类（可扩展）
+│       └── resources/
+│           ├── application.properties           # Spring Boot主配置
+│           └── application.yml                  # 其他YAML配置
+```
+
+---
+
+## 三、前端目录结构与文件作用
+
+```
+tool-web-frontend/
+├── package.json                  # 前端依赖与脚本
+├── vite.config.ts                # Vite开发服务器与代理配置
+├── tsconfig*.json                # TypeScript配置
+├── src/
+│   ├── App.tsx                   # 应用入口组件
+│   ├── main.tsx                  # 入口渲染文件
+│   ├── router/
+│   │   └── index.tsx             # 路由配置
+│   ├── components/
+│   │   └── Layout/
+│   │       └── index.tsx         # 页面布局与导航
+│   ├── pages/
+│   │   ├── Home/                 # 首页
+│   │   │   └── index.tsx
+│   │   ├── Convert/              # 格式转换页
+│   │   │   └── index.tsx
+│   │   ├── Compress/             # 压缩解压页
+│   │   │   └── index.tsx
+│   │   └── Security/             # 安全工具页
+│   │       └── index.tsx
+│   └── assets/                   # 静态资源
+│   └── index.css, App.css        # 全局样式
+```
+
+---
+
+## 四、前后端请求详细解析流程
+
+### 1. 以"文件格式转换"为例
+
+#### 1) 前端流程
+- 用户在`/convert`页面选择文件和目标格式，点击"开始转换"。
+- 触发`axios.post('/api/convert', formData)`，通过Vite代理转发到后端。
+- 前端显示进度条，等待后端响应。
+- 后端返回转换后文件的下载链接，前端自动触发下载。
+
+#### 2) 前端请求代码(简化)
+```js
+axios.post('/api/convert', formData, {
+  headers: { 'Content-Type': 'multipart/form-data' },
+  onUploadProgress: ...
+})
+```
+
+#### 3) Vite代理
+- `vite.config.ts` 配置：
+```js
+proxy: {
+  '/api': {
+    target: 'http://localhost:8080',
+    changeOrigin: true,
+    secure: false,
+  }
+}
+```
+- 所有`/api`请求自动转发到后端8080端口。
+
+#### 4) 后端流程
+- Spring Boot接收`/api/convert` POST请求，由`ConvertController`处理：
+  - 保存上传文件到本地或对象存储
+  - 执行格式转换(如有)
+  - 返回转换后文件的下载URL
+- 下载URL如`/api/files/xxxx.xxx`，由`ConvertController`的`@GetMapping`方法处理，读取文件并返回二进制流。
+
+#### 5) 后端接口代码(简化)
+```java
+@PostMapping(value = "/convert", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+public ResponseEntity<?> convertFile(@RequestParam("file") MultipartFile file,
+                                     @RequestParam("targetFormat") String targetFormat) {
+    // ...保存、转换、返回下载链接...
+}
+```
+
+#### 6) 数据流向总结
+- 用户操作 → 前端页面 → axios请求 → Vite代理 → 后端Controller → 业务处理 → 返回结果 → 前端展示/下载
+
+---
+
+### 2. 其他功能(压缩解压、安全工具)
+- 流程与"格式转换"类似，均为：
+  - 前端页面收集参数，发起`/api/xxx`请求
+  - Vite代理转发
+  - 后端Controller处理业务，返回结果
+  - 前端展示结果或下载文件
+
+---
+
+## 五、常见问题与排查建议
+
+1. **前端请求404**：多为Vite代理未生效或后端接口路径不一致。
+2. **后端404且日志显示ResourceHttpRequestHandler**：多为静态资源优先级覆盖或代理未生效。
+3. **Controller未加载**：检查包结构、启动类、依赖。
+4. **接口无响应**：检查端口、代理、CORS配置。
+
+---
+
+如需详细代码解析或某一功能流程，请补充说明。 

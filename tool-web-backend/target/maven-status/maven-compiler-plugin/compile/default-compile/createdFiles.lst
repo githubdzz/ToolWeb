@@ -1,0 +1,12 @@
+com\toolweb\config\RedisConfig.class
+com\toolweb\config\MinioConfig.class
+com\toolweb\controller\ConvertController.class
+com\toolweb\config\CorsConfig.class
+com\toolweb\config\WebConfig.class
+com\toolweb\controller\FileController.class
+com\toolweb\common\Result.class
+com\toolweb\service\FileService.class
+com\toolweb\service\impl\FileServiceImpl.class
+com\toolweb\config\SecurityConfig.class
+com\toolweb\ToolWebApplication.class
+com\toolweb\common\FileUtils.class
