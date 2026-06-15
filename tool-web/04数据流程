@@ -1,0 +1,208 @@
+# 项目目录结构与数据流程说明（细致版）
+
+## 一、项目总览
+
+```
+/tool-web-backend      # 后端Spring Boot服务
+/tool-web-frontend     # 前端React+Vite项目
+/tool-web              # 项目文档与架构说明
+```
+
+---
+
+## 二、后端目录结构与文件作用（细致说明）
+
+```
+tool-web-backend/
+├── pom.xml                        # Maven依赖配置，管理所有Java依赖包
+├── src/
+│   └── main/
+│       ├── java/
+│       │   └── com/toolweb/
+│       │       ├── ToolWebApplication.java      # Spring Boot启动类，项目入口
+│       │       ├── controller/                  # 控制器，负责接收和响应HTTP请求
+│       │       │   ├── ConvertController.java   # 文件格式转换接口，处理上传、转换、下载
+│       │       │   └── FileController.java      # 文件上传/下载等接口，统一文件流转
+│       │       ├── config/                      # 配置类，集中管理各类中间件和安全策略
+│       │       │   ├── WebConfig.java           # 跨域、静态资源等配置
+│       │       │   ├── SecurityConfig.java      # Spring Security安全配置，接口权限
+│       │       │   ├── RedisConfig.java         # Redis相关配置，缓存加速
+│       │       │   ├── MinioConfig.java         # Minio对象存储配置，文件云存储
+│       │       │   └── CorsConfig.java          # CORS跨域配置，前后端联调
+│       │       ├── service/                     # 业务服务层，具体业务逻辑实现
+│       │       └── common/                      # 通用工具类，辅助功能
+│       └── resources/
+│           ├── application.properties           # Spring Boot主配置，端口、数据库等
+│           └── application.yml                  # 其他YAML配置
+```
+
+### 后端数据流转说明
+- Controller 层负责接收前端请求，参数校验。
+- Service 层处理具体业务逻辑，如文件转换、压缩、解压。
+- 配置类负责中间件（如Redis、Minio）初始化与连接。
+- 处理结果通过 Controller 返回前端，或生成下载链接。
+
+---
+
+## 三、前端目录结构与文件作用（细致说明）
+
+```
+tool-web-frontend/
+├── package.json                  # 前端依赖与脚本，管理React/Vite等依赖
+├── vite.config.ts                # Vite开发服务器与代理配置，前后端联调关键
+├── tsconfig*.json                # TypeScript配置，类型检查
+├── src/
+│   ├── App.tsx                   # 应用入口组件，顶层路由与布局
+│   ├── main.tsx                  # 入口渲染文件，挂载React应用
+│   ├── router/
+│   │   └── index.tsx             # 路由配置，页面跳转
+│   ├── components/
+│   │   └── Layout/
+│   │       └── index.tsx         # 页面布局与导航栏
+│   ├── pages/
+│   │   ├── Home/                 # 首页
+│   │   │   └── index.tsx
+│   │   ├── Convert/              # 格式转换页，文件上传与转换
+│   │   │   └── index.tsx
+│   │   ├── Compress/             # 压缩解压页，文件压缩/解压
+│   │   │   └── index.tsx
+│   │   └── Security/             # 安全工具页，加密/解密等
+│   │       └── index.tsx
+│   └── assets/                   # 静态资源，如图片、icon
+│   └── index.css, App.css        # 全局样式
+```
+
+### 前端数据流转说明
+- 页面组件负责收集用户输入（如文件、参数）。
+- 通过 axios/fetch 发起 API 请求，数据以 FormData 或 JSON 形式传递。
+- 进度、结果通过状态管理（如useState）实时反馈给用户。
+- 下载文件通过浏览器自动触发。
+
+---
+
+## 四、前后端请求详细解析流程（含数据流程图）
+
+### 1. 文件格式转换功能
+
+#### 1) 详细数据流程说明
+- 用户在前端`/convert`页面选择文件与目标格式，点击"开始转换"。
+- 前端将文件与参数封装为FormData，通过axios发起POST请求到`/api/convert`。
+- Vite代理将请求转发到后端Spring Boot服务。
+- 后端`ConvertController`接收请求，保存文件到本地或Minio对象存储。
+- Service层调用格式转换逻辑，生成新文件。
+- 后端返回新文件的下载URL。
+- 前端收到URL后自动发起下载请求，用户获取转换后文件。
+
+#### 2) 数据流程图（Mermaid语法）
+```mermaid
+sequenceDiagram
+    participant U as 用户
+    participant F as 前端页面
+    participant V as Vite代理
+    participant B as 后端Controller
+    participant S as Service层
+    participant M as Minio存储
+    U->>F: 选择文件/格式，点击转换
+    F->>V: axios.post('/api/convert', FormData)
+    V->>B: 转发API请求
+    B->>M: 保存上传文件
+    B->>S: 调用格式转换逻辑
+    S->>M: 读取/写入文件
+    S-->>B: 返回转换结果路径
+    B-->>F: 返回下载URL
+    F->>U: 自动下载文件
+```
+
+#### 3) 关键代码片段
+```js
+// 前端请求
+axios.post('/api/convert', formData, {
+  headers: { 'Content-Type': 'multipart/form-data' },
+  onUploadProgress: ...
+})
+```
+```java
+// 后端接口
+@PostMapping(value = "/convert", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+public ResponseEntity<?> convertFile(@RequestParam("file") MultipartFile file,
+                                     @RequestParam("targetFormat") String targetFormat) {
+    // ...保存、转换、返回下载链接...
+}
+```
+
+---
+
+### 2. 压缩解压功能
+
+#### 1) 详细数据流程说明
+- 用户在前端`/compress`页面选择文件与压缩/解压参数。
+- 前端通过axios发起POST请求到`/api/compress`。
+- Vite代理转发请求到后端。
+- 后端`CompressController`处理文件压缩/解压，生成新文件。
+- 返回下载链接，前端自动下载。
+
+#### 2) 数据流程图（Mermaid语法）
+```mermaid
+sequenceDiagram
+    participant U as 用户
+    participant F as 前端页面
+    participant V as Vite代理
+    participant B as 后端Controller
+    participant S as Service层
+    U->>F: 选择文件/参数，点击压缩/解压
+    F->>V: axios.post('/api/compress', FormData)
+    V->>B: 转发API请求
+    B->>S: 调用压缩/解压逻辑
+    S-->>B: 返回新文件路径
+    B-->>F: 返回下载URL
+    F->>U: 自动下载文件
+```
+
+---
+
+### 3. 安全工具功能（如加密/解密）
+
+#### 1) 详细数据流程说明
+- 用户在前端`/security`页面输入待加密/解密内容与参数。
+- 前端通过axios发起POST请求到`/api/security`。
+- Vite代理转发请求到后端。
+- 后端`SecurityController`处理加密/解密逻辑，返回结果。
+- 前端展示加密/解密后的内容。
+
+#### 2) 数据流程图（Mermaid语法）
+```mermaid
+sequenceDiagram
+    participant U as 用户
+    participant F as 前端页面
+    participant V as Vite代理
+    participant B as 后端Controller
+    participant S as Service层
+    U->>F: 输入内容/参数，点击加密/解密
+    F->>V: axios.post('/api/security', JSON)
+    V->>B: 转发API请求
+    B->>S: 调用加密/解密逻辑
+    S-->>B: 返回处理结果
+    B-->>F: 返回加密/解密内容
+    F->>U: 展示结果
+```
+
+---
+
+## 五、常见问题与排查建议（细化）
+
+1. **前端请求404**：
+   - 检查Vite代理配置（vite.config.ts），确认`/api`代理到后端端口。
+   - 检查前端请求路径与后端Controller接口路径是否一致。
+2. **后端404且日志显示ResourceHttpRequestHandler**：
+   - 检查静态资源优先级，确保API接口未被静态资源覆盖。
+   - 检查Vite代理是否生效。
+3. **Controller未加载**：
+   - 检查包结构、启动类（ToolWebApplication.java）是否正确。
+   - 检查Maven依赖是否完整，尝试`mvn clean install`。
+4. **接口无响应**：
+   - 检查后端端口是否启动，前端代理端口是否一致。
+   - 检查CORS配置，确保跨域允许。
+
+---
+
+如需详细代码解析或某一功能流程，请补充说明。 
