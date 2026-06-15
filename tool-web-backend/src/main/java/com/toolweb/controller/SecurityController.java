@@ -1,9 +1,11 @@
 package com.toolweb.controller;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import com.toolweb.service.FileService;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -11,24 +13,39 @@ import java.util.Map;
 @RequestMapping("/api")
 public class SecurityController {
 
+    @Autowired
+    private FileService fileService;
+
     @PostMapping(value = "/encrypt", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<?> encryptFile(@RequestParam("file") MultipartFile file,
                                          @RequestParam("password") String password) {
-        // TODO: 实现加密逻辑，返回加密文件下载链接
-        Map<String, String> response = new HashMap<>();
-        response.put("url", "/api/files/mock_encrypted.enc");
-        response.put("message", "加密成功（模拟）");
-        return ResponseEntity.ok(response);
+        try {
+            String fileName = fileService.encryptFile(file, password);
+            Map<String, String> response = new HashMap<>();
+            response.put("url", "/api/files/" + fileName);
+            response.put("message", "加密成功");
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            Map<String, String> error = new HashMap<>();
+            error.put("message", "加密失败: " + e.getMessage());
+            return ResponseEntity.badRequest().body(error);
+        }
     }
 
     @PostMapping(value = "/decrypt", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<?> decryptFile(@RequestParam("file") MultipartFile file,
                                          @RequestParam("password") String password) {
-        // TODO: 实现解密逻辑，返回解密文件下载链接
-        Map<String, String> response = new HashMap<>();
-        response.put("url", "/api/files/mock_decrypted.txt");
-        response.put("message", "解密成功（模拟）");
-        return ResponseEntity.ok(response);
+        try {
+            String fileName = fileService.decryptFile(file, password);
+            Map<String, String> response = new HashMap<>();
+            response.put("url", "/api/files/" + fileName);
+            response.put("message", "解密成功");
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            Map<String, String> error = new HashMap<>();
+            error.put("message", "解密失败: " + e.getMessage());
+            return ResponseEntity.badRequest().body(error);
+        }
     }
 
     @PostMapping(value = "/qrcode", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)

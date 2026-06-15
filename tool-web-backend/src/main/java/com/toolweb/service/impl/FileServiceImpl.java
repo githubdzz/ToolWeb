@@ -89,18 +89,26 @@ public class FileServiceImpl implements FileService {
             for (MultipartFile file : files) {
                 Path tempFile = Path.of(tempDir, file.getOriginalFilename());
                 file.transferTo(tempFile);
-                zipFile.addFile(tempFile.toFile(), parameters);
+                try (FileInputStream fis = new FileInputStream(tempFile.toFile())) {
+                    parameters.setFileNameInZip(file.getOriginalFilename());
+                    zipFile.addStream(fis, parameters);
+                }
                 Files.delete(tempFile);
             }
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw e;
         }
 
         String fileName = FileUtils.generateFileName(zipPath.getFileName().toString());
-        minioClient.putObject(PutObjectArgs.builder()
+        try (FileInputStream zipFis = new FileInputStream(zipPath.toFile())) {
+            minioClient.putObject(PutObjectArgs.builder()
                 .bucket(bucket)
                 .object(fileName)
-                .stream(new FileInputStream(zipPath.toFile()), Files.size(zipPath), -1)
+                .stream(zipFis, Files.size(zipPath), -1)
                 .contentType("application/zip")
                 .build());
+        }
         Files.delete(zipPath);
         return fileName;
     }

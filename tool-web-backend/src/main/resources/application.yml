@@ -28,7 +28,7 @@ spring:
 
 # MinIO配置
 minio:
-  endpoint: http://localhost:9000
+  endpoint: http://localhost:9005
   accessKey: minioadmin
   secretKey: Dzz000721!
   bucket: tool-web
